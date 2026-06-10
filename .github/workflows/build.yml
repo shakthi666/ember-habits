@@ -118,11 +118,14 @@ jobs:
           g = g.replace('minSdkVersion flutter.minSdkVersion', 'minSdkVersion 23')
 
           if is_kts:
+              imports = 'import java.io.FileInputStream\nimport java.util.Properties\n\n'
+              if 'import java.util.Properties' not in g:
+                  g = imports + g
               props = (
-                  'val keystoreProperties = java.util.Properties()\n'
+                  'val keystoreProperties = Properties()\n'
                   'val keystorePropertiesFile = rootProject.file("key.properties")\n'
                   'if (keystorePropertiesFile.exists()) {\n'
-                  '    keystoreProperties.load(java.io.FileInputStream(keystorePropertiesFile))\n'
+                  '    keystoreProperties.load(FileInputStream(keystorePropertiesFile))\n'
                   '}\n\n'
               )
               signing = (
