@@ -1,0 +1,199 @@
+# ============================================================
+#  EMBER — CLOUD BUILD
+#  You never run this by hand on your computer. GitHub runs it.
+#  It builds two files:
+#    - app-release.aab  -> upload this to Google Play Console
+#    - app-release.apk  -> install this on your own phone to test
+#  It runs automatically every time you edit a file on GitHub,
+#  or when you press "Run workflow" on the Actions tab.
+# ============================================================
+
+name: Build Ember (Play Store files)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, master]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+      STORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD || 'ember2026' }}
+    steps:
+      - name: Get the code
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.32.0"
+          channel: stable
+
+      - name: Generate Android project files
+        run: |
+          flutter create --platforms android --org com.shakthi --project-name ember_habits .
+          flutter pub get
+
+      - name: Generate app icons
+        run: dart run flutter_launcher_icons
+
+      - name: Prepare signing key
+        run: |
+          mkdir -p "$HOME/keys"
+          KS="$HOME/keys/upload-keystore.jks"
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 --decode > "$KS"
+            echo "Using the saved keystore from your GitHub secret."
+          else
+            echo "No saved keystore found - creating a brand new one."
+            keytool -genkeypair -v -keystore "$KS" \
+              -alias upload -keyalg RSA -keysize 2048 -validity 10000 \
+              -storepass "$STORE_PASSWORD" -keypass "$STORE_PASSWORD" \
+              -dname "CN=Ember, OU=Apps, O=Ember, L=Internet, ST=Internet, C=US"
+            mkdir -p key-backup
+            base64 -w 0 "$KS" > key-backup/KEYSTORE_BASE64.txt
+            {
+              echo "IMPORTANT - DO THIS ONCE (takes 3 minutes):"
+              echo ""
+              echo "This file is your app's signing key. If you lose it you"
+              echo "cannot update your app with this key again."
+              echo ""
+              echo "1. In your GitHub repo go to: Settings > Secrets and variables > Actions"
+              echo "2. Click 'New repository secret'"
+              echo "3. Name:  KEYSTORE_BASE64"
+              echo "   Value: open KEYSTORE_BASE64.txt, copy ALL the text, paste it"
+              echo "4. Click 'New repository secret' again"
+              echo "   Name:  KEYSTORE_PASSWORD"
+              echo "   Value: ember2026"
+              echo ""
+              echo "From then on every build reuses this same key."
+            } > key-backup/READ-ME-FIRST.txt
+          fi
+          cat > android/key.properties <<EOF
+          storePassword=$STORE_PASSWORD
+          keyPassword=$STORE_PASSWORD
+          keyAlias=upload
+          storeFile=$KS
+          EOF
+
+      - name: Configure app (ads ID, name, signing)
+        run: |
+          python3 - <<'PYEOF'
+          import os, re, sys
+
+          # ---------- 1. AdMob App ID into AndroidManifest.xml ----------
+          app_id = open('admob_app_id.txt').read().strip()
+          if not app_id.startswith('ca-app-pub-'):
+              # Google's official sample App ID, safe for testing
+              app_id = 'ca-app-pub-3940256099942544~3347511713'
+              print('admob_app_id.txt not filled in yet -> using Google TEST App ID')
+          mf_path = 'android/app/src/main/AndroidManifest.xml'
+          mf = open(mf_path).read()
+          meta = ('        <meta-data\n'
+                  '            android:name="com.google.android.gms.ads.APPLICATION_ID"\n'
+                  f'            android:value="{app_id}"/>\n')
+          if 'com.google.android.gms.ads.APPLICATION_ID' not in mf:
+              assert '</application>' in mf, 'manifest missing </application>'
+              mf = mf.replace('</application>', meta + '    </application>')
+          mf = mf.replace('android:label="ember_habits"', 'android:label="Ember"')
+          open(mf_path, 'w').write(mf)
+          print('Manifest OK ->', app_id)
+
+          # ---------- 2. Gradle: minSdk 23 + release signing ----------
+          kts = 'android/app/build.gradle.kts'
+          groovy = 'android/app/build.gradle'
+          path = kts if os.path.exists(kts) else groovy
+          g = open(path).read()
+          is_kts = path.endswith('.kts')
+
+          g = g.replace('minSdk = flutter.minSdkVersion', 'minSdk = 23')
+          g = g.replace('minSdkVersion flutter.minSdkVersion', 'minSdkVersion 23')
+
+          if is_kts:
+              props = (
+                  'val keystoreProperties = java.util.Properties()\n'
+                  'val keystorePropertiesFile = rootProject.file("key.properties")\n'
+                  'if (keystorePropertiesFile.exists()) {\n'
+                  '    keystoreProperties.load(java.io.FileInputStream(keystorePropertiesFile))\n'
+                  '}\n\n'
+              )
+              signing = (
+                  '    signingConfigs {\n'
+                  '        create("release") {\n'
+                  '            keyAlias = keystoreProperties["keyAlias"] as String\n'
+                  '            keyPassword = keystoreProperties["keyPassword"] as String\n'
+                  '            storeFile = file(keystoreProperties["storeFile"] as String)\n'
+                  '            storePassword = keystoreProperties["storePassword"] as String\n'
+                  '        }\n'
+                  '    }\n\n'
+              )
+              old_ref = 'signingConfigs.getByName("debug")'
+              new_ref = 'signingConfigs.getByName("release")'
+          else:
+              props = (
+                  'def keystoreProperties = new Properties()\n'
+                  'def keystorePropertiesFile = rootProject.file("key.properties")\n'
+                  'if (keystorePropertiesFile.exists()) {\n'
+                  '    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))\n'
+                  '}\n\n'
+              )
+              signing = (
+                  '    signingConfigs {\n'
+                  '        release {\n'
+                  '            keyAlias keystoreProperties["keyAlias"]\n'
+                  '            keyPassword keystoreProperties["keyPassword"]\n'
+                  '            storeFile file(keystoreProperties["storeFile"])\n'
+                  '            storePassword keystoreProperties["storePassword"]\n'
+                  '        }\n'
+                  '    }\n\n'
+              )
+              old_ref = 'signingConfigs.debug'
+              new_ref = 'signingConfigs.release'
+
+          m = re.search(r'^android\s*\{', g, flags=re.M)
+          assert m, 'could not find android { block in ' + path
+          g = g[:m.start()] + props + g[m.start():]
+
+          m = re.search(r'^\s*buildTypes\s*\{', g, flags=re.M)
+          assert m, 'could not find buildTypes { block in ' + path
+          g = g[:m.start()] + signing + g[m.start():]
+
+          assert old_ref in g, 'could not find debug signing reference in ' + path
+          g = g.replace(old_ref, new_ref)
+
+          open(path, 'w').write(g)
+          print('Gradle OK ->', path)
+          PYEOF
+
+      - name: Build Play Store file (.aab)
+        run: flutter build appbundle --release
+
+      - name: Build test file for your own phone (.apk)
+        run: flutter build apk --release
+
+      - name: Upload Play Store file
+        uses: actions/upload-artifact@v4
+        with:
+          name: PLAY-STORE-FILE-upload-this-to-google
+          path: build/app/outputs/bundle/release/app-release.aab
+
+      - name: Upload phone test file
+        uses: actions/upload-artifact@v4
+        with:
+          name: TEST-ON-YOUR-PHONE-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+
+      - name: Upload new signing key (first run only)
+        if: ${{ hashFiles('key-backup/KEYSTORE_BASE64.txt') != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: SIGNING-KEY-SAVE-THIS-read-instructions-inside
+          path: key-backup/
