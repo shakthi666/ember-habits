@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'ads.dart';
 import 'habits.dart';
+import 'l10n.dart';
 import 'theme.dart';
 
 class StatsScreen extends StatelessWidget {
@@ -10,20 +11,21 @@ class StatsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = EmberPalette.of(context);
+    final b = Theme.of(context).brightness;
 
     return AnimatedBuilder(
       animation: store,
       builder: (context, _) {
         var best = 0;
-        for (final h in store.habits) {
+        for (final h in store.active) {
           if (h.bestStreak > best) best = h.bestStreak;
         }
         final done = store.doneTodayCount;
-        final total = store.habits.length;
+        final due = store.dueTodayCount;
 
         return Scaffold(
           appBar: AppBar(
-            title: Text('Your progress',
+            title: Text(L10n.t('yourProgress'),
                 style: TextStyle(fontWeight: FontWeight.w700, color: p.ink)),
           ),
           bottomNavigationBar: const BannerAdBox(),
@@ -36,7 +38,7 @@ class StatsScreen extends StatelessWidget {
                     child: _MetricCard(
                       bg: p.chipBg,
                       labelColor: p.chipText,
-                      label: 'Best streak',
+                      label: L10n.t('bestStreak'),
                       value: '$best',
                       icon: Icons.local_fire_department,
                     ),
@@ -46,24 +48,15 @@ class StatsScreen extends StatelessWidget {
                     child: _MetricCard(
                       bg: p.soft,
                       labelColor: p.accentDeep,
-                      label: 'Today',
-                      value: '$done / $total',
+                      label: L10n.t('todayLabel'),
+                      value: '$done / $due',
                       icon: Icons.check_circle,
                     ),
                   ),
                 ],
               ),
               const SizedBox(height: 16),
-              if (store.habits.isEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(top: 40),
-                  child: Text(
-                    'Add a habit first — your stats will grow here.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: p.muted),
-                  ),
-                ),
-              for (final h in store.habits)
+              for (final h in store.active)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 10),
                   child: Container(
@@ -78,7 +71,7 @@ class StatsScreen extends StatelessWidget {
                       children: [
                         Row(
                           children: [
-                            Icon(h.icon, size: 18, color: p.accentDeep),
+                            Icon(h.icon, size: 18, color: h.color(b)),
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(h.name,
@@ -90,7 +83,7 @@ class StatsScreen extends StatelessWidget {
                                       color: p.ink)),
                             ),
                             Text(
-                              'now ${h.currentStreak} · best ${h.bestStreak}',
+                              '${L10n.t('now')} ${h.currentStreak} · ${L10n.t('best')} ${h.bestStreak}',
                               style:
                                   TextStyle(fontSize: 12, color: p.muted),
                             ),
@@ -107,7 +100,7 @@ class StatsScreen extends StatelessWidget {
                                 FractionallySizedBox(
                                   widthFactor:
                                       h.completionLast30().clamp(0.0, 1.0),
-                                  child: Container(color: p.accent),
+                                  child: Container(color: h.color(b)),
                                 ),
                               ],
                             ),
@@ -115,7 +108,9 @@ class StatsScreen extends StatelessWidget {
                         ),
                         const SizedBox(height: 6),
                         Text(
-                          '${(h.completionLast30() * 100).round()}% of the last 30 days · ${h.totalDone} total check-ins',
+                          '${L10n.f('last30', [
+                                (h.completionLast30() * 100).round()
+                              ])} · ${L10n.f('checkIns', [h.totalDone])}',
                           style: TextStyle(fontSize: 12, color: p.muted),
                         ),
                       ],

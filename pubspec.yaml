@@ -1,7 +1,7 @@
 name: ember_habits
-description: "Ember - a warm, simple habit tracker with streaks. Light & dark mode, fully offline."
+description: "Ember - a warm, simple habit tracker with streaks, reminders, widget and 39 languages. Offline."
 publish_to: "none"
-version: 1.0.0+1
+version: 1.1.0+2
 
 environment:
   sdk: ">=3.4.0 <4.0.0"
@@ -11,6 +11,10 @@ dependencies:
     sdk: flutter
   google_mobile_ads: ^5.2.0
   shared_preferences: ^2.3.0
+  flutter_local_notifications: ^17.2.3
+  timezone: ^0.9.4
+  flutter_timezone: ^3.0.1
+  home_widget: ^0.7.0
   cupertino_icons: ^1.0.8
 
 dev_dependencies:

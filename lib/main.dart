@@ -1,8 +1,16 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 
 import 'ads.dart';
+import 'detail.dart';
+import 'edit_sheet.dart';
 import 'habits.dart';
+import 'l10n.dart';
+import 'notifications.dart';
+import 'settings.dart';
 import 'stats.dart';
 import 'theme.dart';
 
@@ -10,7 +18,10 @@ void main() {
   WidgetsFlutterBinding.ensureInitialized();
   MobileAds.instance.initialize();
   InterstitialManager.instance.preload();
-  store.load();
+  initNotifications().then((_) async {
+    await store.load();
+    await rescheduleAllReminders(store);
+  });
   runApp(const EmberApp());
 }
 
@@ -33,67 +44,38 @@ class EmberApp extends StatelessWidget {
   }
 }
 
-const _weekdays = [
-  'Monday',
-  'Tuesday',
-  'Wednesday',
-  'Thursday',
-  'Friday',
-  'Saturday',
-  'Sunday'
-];
-const _months = [
-  'January',
-  'February',
-  'March',
-  'April',
-  'May',
-  'June',
-  'July',
-  'August',
-  'September',
-  'October',
-  'November',
-  'December'
-];
-
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
     final p = EmberPalette.of(context);
-    final now = DateTime.now();
-    final dateLine =
-        '${_weekdays[now.weekday - 1]}, ${_months[now.month - 1]} ${now.day}';
 
     return AnimatedBuilder(
       animation: store,
       builder: (context, _) {
-        final total = store.habits.length;
+        final now = DateTime.now();
+        final dateLine =
+            '${L10n.weekdayName(now.weekday)}, ${L10n.monthName(now.month)} ${now.day}';
+        final due = store.dueTodayCount;
         final done = store.doneTodayCount;
+        final habits = store.active;
+
         return Scaffold(
           appBar: AppBar(
             title: Text('Ember',
                 style: TextStyle(fontWeight: FontWeight.w700, color: p.ink)),
             actions: [
               IconButton(
-                tooltip: 'Light / dark mode',
-                icon: Icon(
-                  switch (store.themeMode) {
-                    ThemeMode.system => Icons.brightness_auto,
-                    ThemeMode.light => Icons.light_mode,
-                    ThemeMode.dark => Icons.dark_mode,
-                  },
-                  color: p.muted,
-                ),
-                onPressed: store.cycleTheme,
-              ),
-              IconButton(
-                tooltip: 'Your progress',
                 icon: Icon(Icons.bar_chart, color: p.muted),
                 onPressed: () => Navigator.of(context).push(
                   MaterialPageRoute(builder: (_) => const StatsScreen()),
+                ),
+              ),
+              IconButton(
+                icon: Icon(Icons.settings_outlined, color: p.muted),
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const SettingsScreen()),
                 ),
               ),
             ],
@@ -102,32 +84,65 @@ class HomeScreen extends StatelessWidget {
           floatingActionButton: FloatingActionButton.extended(
             backgroundColor: p.accent,
             foregroundColor: p.onAccent,
-            onPressed: () => _showAddSheet(context),
+            onPressed: () => showHabitSheet(context),
             icon: const Icon(Icons.add),
-            label: const Text('New habit',
-                style: TextStyle(fontWeight: FontWeight.w600)),
+            label: Text(L10n.t('newHabit'),
+                style: const TextStyle(fontWeight: FontWeight.w600)),
           ),
           body: !store.loaded
               ? const Center(child: CircularProgressIndicator())
-              : store.habits.isEmpty
-                  ? _EmptyState(palette: p)
-                  : ListView(
-                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 96),
+              : habits.isEmpty
+                  ? _EmptyState(p: p)
+                  : Column(
                       children: [
                         Padding(
-                          padding: const EdgeInsets.only(left: 4, bottom: 12),
-                          child: Text(
-                            total == 0
-                                ? dateLine
-                                : '$dateLine  ·  $done of $total done',
-                            style: TextStyle(color: p.muted, fontSize: 14),
+                          padding:
+                              const EdgeInsets.fromLTRB(20, 4, 20, 10),
+                          child: Row(
+                            children: [
+                              _ProgressRing(
+                                  fraction: due == 0 ? 0 : done / due,
+                                  p: p),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.start,
+                                  children: [
+                                    Text(dateLine,
+                                        style: TextStyle(
+                                            color: p.ink,
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.w600)),
+                                    const SizedBox(height: 2),
+                                    Text(L10n.f('doneOf', [done, due]),
+                                        style: TextStyle(
+                                            color: p.muted, fontSize: 13)),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        for (final h in store.habits)
+                        if (store.allDoneToday)
                           Padding(
-                            padding: const EdgeInsets.only(bottom: 10),
-                            child: _HabitCard(habit: h),
+                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                            child: _CelebrationCard(p: p),
                           ),
+                        Expanded(
+                          child: ReorderableListView.builder(
+                            buildDefaultDragHandles: false,
+                            padding:
+                                const EdgeInsets.fromLTRB(16, 0, 16, 96),
+                            itemCount: habits.length,
+                            onReorder: store.reorder,
+                            itemBuilder: (context, i) => Padding(
+                              key: ValueKey(habits[i].id),
+                              padding: const EdgeInsets.only(bottom: 10),
+                              child: _HabitCard(habit: habits[i], index: i),
+                            ),
+                          ),
+                        ),
                       ],
                     ),
         );
@@ -136,9 +151,112 @@ class HomeScreen extends StatelessWidget {
   }
 }
 
+class _ProgressRing extends StatelessWidget {
+  final double fraction;
+  final EmberPalette p;
+  const _ProgressRing({required this.fraction, required this.p});
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: fraction.clamp(0.0, 1.0)),
+      duration: const Duration(milliseconds: 450),
+      curve: Curves.easeOutCubic,
+      builder: (context, v, _) => CustomPaint(
+        size: const Size(46, 46),
+        painter: _RingPainter(v, p.accent, p.empty),
+        child: SizedBox(
+          width: 46,
+          height: 46,
+          child: Center(
+            child: Text('${(v * 100).round()}',
+                style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: p.ink)),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _RingPainter extends CustomPainter {
+  final double fraction;
+  final Color accent;
+  final Color track;
+  _RingPainter(this.fraction, this.accent, this.track);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final c = Offset(size.width / 2, size.height / 2);
+    final r = size.width / 2 - 3;
+    final trackPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 5
+      ..color = track;
+    final arcPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 5
+      ..strokeCap = StrokeCap.round
+      ..color = accent;
+    canvas.drawCircle(c, r, trackPaint);
+    canvas.drawArc(Rect.fromCircle(center: c, radius: r), -math.pi / 2,
+        2 * math.pi * fraction, false, arcPaint);
+  }
+
+  @override
+  bool shouldRepaint(_RingPainter old) =>
+      old.fraction != fraction || old.accent != accent;
+}
+
+class _CelebrationCard extends StatelessWidget {
+  final EmberPalette p;
+  const _CelebrationCard({required this.p});
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0.85, end: 1),
+      duration: const Duration(milliseconds: 350),
+      curve: Curves.easeOutBack,
+      builder: (context, v, child) => Transform.scale(scale: v, child: child),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: p.chipBg,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.local_fire_department, color: p.chipText, size: 28),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(L10n.t('allDone'),
+                      style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                          color: p.chipText)),
+                  Text(L10n.t('allDoneSub'),
+                      style:
+                          TextStyle(fontSize: 12, color: p.chipText)),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _EmptyState extends StatelessWidget {
-  final EmberPalette palette;
-  const _EmptyState({required this.palette});
+  final EmberPalette p;
+  const _EmptyState({required this.p});
 
   @override
   Widget build(BuildContext context) {
@@ -152,21 +270,21 @@ class _EmptyState extends StatelessWidget {
               width: 88,
               height: 88,
               decoration:
-                  BoxDecoration(color: palette.soft, shape: BoxShape.circle),
+                  BoxDecoration(color: p.soft, shape: BoxShape.circle),
               child: Icon(Icons.local_fire_department,
-                  size: 44, color: palette.accent),
+                  size: 44, color: p.accent),
             ),
             const SizedBox(height: 20),
-            Text('Light your first ember',
+            Text(L10n.t('emptyTitle'),
                 style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.w700,
-                    color: palette.ink)),
+                    color: p.ink)),
             const SizedBox(height: 8),
             Text(
-              'Add a small habit you want to do every day.\nSmall and daily beats big and rare.',
+              L10n.t('emptySub'),
               textAlign: TextAlign.center,
-              style: TextStyle(color: palette.muted, fontSize: 14, height: 1.5),
+              style: TextStyle(color: p.muted, fontSize: 14, height: 1.5),
             ),
           ],
         ),
@@ -177,12 +295,17 @@ class _EmptyState extends StatelessWidget {
 
 class _HabitCard extends StatelessWidget {
   final Habit habit;
-  const _HabitCard({required this.habit});
+  final int index;
+  const _HabitCard({required this.habit, required this.index});
 
   @override
   Widget build(BuildContext context) {
     final p = EmberPalette.of(context);
+    final b = Theme.of(context).brightness;
+    final accent = habit.color(b);
+    final soft = accent.withValues(alpha: b == Brightness.dark ? 0.18 : 0.13);
     final done = habit.doneToday;
+    final due = habit.dueToday;
     final streak = habit.currentStreak;
     final now = DateTime.now();
 
@@ -191,7 +314,10 @@ class _HabitCard extends StatelessWidget {
       borderRadius: BorderRadius.circular(16),
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
-        onLongPress: () => _confirmDelete(context, habit),
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => HabitDetailScreen(habit: habit)),
+        ),
+        onLongPress: () => _showMenu(context, p),
         child: Container(
           decoration: BoxDecoration(
             border: Border.all(color: p.cardBorder),
@@ -200,12 +326,15 @@ class _HabitCard extends StatelessWidget {
           padding: const EdgeInsets.all(14),
           child: Row(
             children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration:
-                    BoxDecoration(color: p.soft, shape: BoxShape.circle),
-                child: Icon(habit.icon, size: 22, color: p.accentDeep),
+              ReorderableDragStartListener(
+                index: index,
+                child: Container(
+                  width: 42,
+                  height: 42,
+                  decoration:
+                      BoxDecoration(color: soft, shape: BoxShape.circle),
+                  child: Icon(habit.icon, size: 22, color: accent),
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -235,33 +364,63 @@ class _HabitCard extends StatelessWidget {
                               Icon(Icons.local_fire_department,
                                   size: 13, color: p.chipText),
                               const SizedBox(width: 3),
-                              Text(
-                                streak == 1 ? '1 day' : '$streak days',
-                                style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w600,
-                                    color: p.chipText),
-                              ),
+                              Text('$streak ${L10n.t('days')}',
+                                  style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: p.chipText)),
                             ],
                           ),
                         ),
+                        if (!due) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: p.soft,
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: Text(L10n.t('restDay'),
+                                style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: p.accentDeep)),
+                          ),
+                        ],
+                        if (habit.reminderMinutes >= 0) ...[
+                          const SizedBox(width: 6),
+                          Icon(Icons.notifications_active,
+                              size: 14, color: p.muted),
+                        ],
                       ],
                     ),
                     const SizedBox(height: 7),
                     Row(
                       children: [
                         for (var i = 6; i >= 0; i--) ...[
-                          Container(
-                            width: 8,
-                            height: 8,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: habit.doneOn(DateTime(
-                                      now.year, now.month, now.day - i))
-                                  ? p.accent
-                                  : p.empty,
-                            ),
-                          ),
+                          Builder(builder: (_) {
+                            final d = DateTime(
+                                now.year, now.month, now.day - i);
+                            final dDone = habit.doneOn(d);
+                            final dDue = habit.dueOn(d);
+                            return Container(
+                              width: 8,
+                              height: 8,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: dDone
+                                    ? accent
+                                    : dDue
+                                        ? p.empty
+                                        : Colors.transparent,
+                                border: dDue
+                                    ? null
+                                    : Border.all(
+                                        color: p.empty, width: 1.5),
+                              ),
+                            );
+                          }),
                           if (i > 0) const SizedBox(width: 5),
                         ],
                       ],
@@ -270,155 +429,152 @@ class _HabitCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 10),
-              InkWell(
-                borderRadius: BorderRadius.circular(999),
-                onTap: () {
-                  final nowDone = store.toggleToday(habit);
-                  if (nowDone) {
-                    InterstitialManager.instance.registerAction();
-                  }
-                },
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 180),
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: done ? p.accent : Colors.transparent,
-                    border: done ? null : Border.all(color: p.accent, width: 2),
-                  ),
-                  child: done
-                      ? Icon(Icons.check, size: 20, color: p.onAccent)
-                      : null,
-                ),
-              ),
+              if (due) _CheckButton(habit: habit, accent: accent, p: p)
             ],
           ),
         ),
       ),
     );
   }
-}
 
-void _confirmDelete(BuildContext context, Habit habit) {
-  final p = EmberPalette.of(context);
-  showDialog<void>(
-    context: context,
-    builder: (ctx) => AlertDialog(
+  void _showMenu(BuildContext context, EmberPalette p) {
+    showModalBottomSheet<void>(
+      context: context,
       backgroundColor: p.card,
-      title: Text('Delete "${habit.name}"?',
-          style: TextStyle(color: p.ink, fontSize: 18)),
-      content: Text('Its streak history will be gone for good.',
-          style: TextStyle(color: p.muted)),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(ctx).pop(),
-          child: Text('Keep', style: TextStyle(color: p.muted)),
-        ),
-        TextButton(
-          onPressed: () {
-            store.remove(habit);
-            Navigator.of(ctx).pop();
-          },
-          child: const Text('Delete', style: TextStyle(color: Colors.red)),
-        ),
-      ],
-    ),
-  );
-}
-
-void _showAddSheet(BuildContext context) {
-  final p = EmberPalette.of(context);
-  final controller = TextEditingController();
-  var selectedIcon = 0;
-
-  showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    backgroundColor: p.card,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-    ),
-    builder: (ctx) => StatefulBuilder(
-      builder: (ctx, setSheetState) => Padding(
-        padding: EdgeInsets.fromLTRB(
-            20, 20, 20, 20 + MediaQuery.of(ctx).viewInsets.bottom),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('New habit',
-                style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
-                    color: p.ink)),
-            const SizedBox(height: 14),
-            TextField(
-              controller: controller,
-              autofocus: true,
-              maxLength: 40,
-              style: TextStyle(color: p.ink),
-              decoration: InputDecoration(
-                hintText: 'e.g. Read 10 pages',
-                hintStyle: TextStyle(color: p.muted),
-                counterText: '',
-                filled: true,
-                fillColor: p.bg,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  borderSide: BorderSide.none,
-                ),
-              ),
+            ListTile(
+              leading: Icon(Icons.edit, color: p.accentDeep),
+              title: Text(L10n.t('edit'), style: TextStyle(color: p.ink)),
+              onTap: () {
+                Navigator.of(ctx).pop();
+                showHabitSheet(context, existing: habit);
+              },
             ),
-            const SizedBox(height: 14),
-            Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: [
-                for (var i = 0; i < habitIcons.length; i++)
-                  InkWell(
-                    borderRadius: BorderRadius.circular(999),
-                    onTap: () => setSheetState(() => selectedIcon = i),
-                    child: Container(
-                      width: 44,
-                      height: 44,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: selectedIcon == i ? p.accent : p.soft,
-                      ),
-                      child: Icon(habitIcons[i],
-                          size: 22,
-                          color:
-                              selectedIcon == i ? p.onAccent : p.accentDeep),
-                    ),
-                  ),
-              ],
+            ListTile(
+              leading: Icon(Icons.archive_outlined, color: p.accentDeep),
+              title:
+                  Text(L10n.t('archive'), style: TextStyle(color: p.ink)),
+              onTap: () {
+                store.setArchived(habit, true);
+                Navigator.of(ctx).pop();
+              },
             ),
-            const SizedBox(height: 18),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                style: FilledButton.styleFrom(
-                  backgroundColor: p.accent,
-                  foregroundColor: p.onAccent,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(999)),
-                ),
-                onPressed: () {
-                  final name = controller.text.trim();
-                  if (name.isEmpty) return;
-                  store.add(name, selectedIcon);
-                  Navigator.of(ctx).pop();
-                },
-                child: const Text('Create habit',
-                    style: TextStyle(
-                        fontSize: 15, fontWeight: FontWeight.w600)),
-              ),
+            ListTile(
+              leading: const Icon(Icons.delete_outline, color: Colors.red),
+              title: Text(L10n.t('delete'),
+                  style: const TextStyle(color: Colors.red)),
+              onTap: () {
+                Navigator.of(ctx).pop();
+                _confirmDelete(context, p);
+              },
             ),
           ],
         ),
       ),
-    ),
-  );
+    );
+  }
+
+  void _confirmDelete(BuildContext context, EmberPalette p) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: p.card,
+        title: Text(L10n.f('deleteQ', [habit.name]),
+            style: TextStyle(color: p.ink, fontSize: 18)),
+        content: Text(L10n.t('deleteWarn'),
+            style: TextStyle(color: p.muted)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(L10n.t('keep'), style: TextStyle(color: p.muted)),
+          ),
+          TextButton(
+            onPressed: () {
+              store.remove(habit);
+              Navigator.of(ctx).pop();
+            },
+            child: Text(L10n.t('delete'),
+                style: const TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CheckButton extends StatelessWidget {
+  final Habit habit;
+  final Color accent;
+  final EmberPalette p;
+  const _CheckButton(
+      {required this.habit, required this.accent, required this.p});
+
+  @override
+  Widget build(BuildContext context) {
+    final done = habit.doneToday;
+
+    void act() {
+      HapticFeedback.lightImpact();
+      final completedNow = store.checkIn(habit);
+      if (completedNow) {
+        InterstitialManager.instance.registerAction();
+      }
+    }
+
+    if (habit.isCounter) {
+      return InkWell(
+        borderRadius: BorderRadius.circular(999),
+        onTap: act,
+        onLongPress: () => store.decrementToday(habit),
+        child: TweenAnimationBuilder<double>(
+          tween: Tween(begin: 1, end: done ? 1.08 : 1),
+          duration: const Duration(milliseconds: 200),
+          builder: (context, v, child) =>
+              Transform.scale(scale: v, child: child),
+          child: Container(
+            width: 52,
+            height: 44,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: done ? accent : Colors.transparent,
+              border:
+                  done ? null : Border.all(color: accent, width: 2),
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: Text(
+              '${habit.countToday}/${habit.target}',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: done ? p.onAccent : accent,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(999),
+      onTap: act,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: done ? accent : Colors.transparent,
+          border: done ? null : Border.all(color: accent, width: 2),
+        ),
+        child:
+            done ? Icon(Icons.check, size: 20, color: p.onAccent) : null,
+      ),
+    );
+  }
 }

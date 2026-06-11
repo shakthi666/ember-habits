@@ -1,6 +1,8 @@
 # Ember — Habit Tracker & Streaks
 
-A warm, simple habit tracker (Bloom design: soft violet + peach streak flames), light & dark mode, fully offline, monetized with Google AdMob.
+A warm, simple habit tracker (Bloom design: soft violet + peach streak flames), monetized with Google AdMob.
+
+Version 1.1: reminders, weekday schedules, skip protection, counter habits, per-habit colors, monthly calendar with editable history, 12-week trends, home-screen widget, offline backup/restore, reorder & archive, and 39 languages (26 European + 12 Indian + English). Light & dark mode, fully offline.
 
 **Start with `SETUP_GUIDE.md`** — click-by-click, no coding.
 

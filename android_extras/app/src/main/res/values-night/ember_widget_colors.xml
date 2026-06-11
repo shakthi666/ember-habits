@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="ember_widget_bg">#211C2E</color>
+    <color name="ember_widget_text">#F2EFFA</color>
+    <color name="ember_widget_muted">#9B92B8</color>
+    <color name="ember_widget_accent">#9D85FF</color>
+    <color name="ember_widget_track">#2C2840</color>
+</resources>

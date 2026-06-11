@@ -86,7 +86,7 @@ GitHub stores your app's files, and its robots compile the app in the cloud. You
      - Encrypted in transit? **Yes**. User-requestable deletion? **No** (data is held by Google AdMob, not you).
      - Google's current recommended answers: support.google.com/admob/answer/10787295
    - **Store listing**:
-     - Short description: `Build habits that stick — warm streaks, gentle stats, dark mode. Offline & free.`
+     - Short description: `Habit tracker with streaks, reminders, widget & 39 languages. Offline & free.`
      - Full description — paste:
 
        ```
@@ -96,12 +96,17 @@ GitHub stores your app's files, and its robots compile the app in the cloud. You
        your progress bloom. No account, no cloud, no pressure — just you
        and your daily embers.
 
-       • One-tap daily check-ins
-       • Streaks that motivate (current & best)
-       • Last-7-days dots on every habit
-       • Gentle 30-day progress stats
-       • Beautiful light AND dark mode
-       • 100% offline — your data never leaves your phone
+       • One-tap check-ins, or counters with a daily target (8 glasses of water)
+       • Gentle daily reminders at the time you choose
+       • Flexible schedules — habits due only on the days you pick
+       • Streaks that respect rest days, plus skip protection for sick days
+       • Monthly calendar view with editable history
+       • 12-week trends and gentle 30-day stats
+       • Home-screen widget with today's progress
+       • 8 warm colors per habit, beautiful light AND dark mode
+       • Available in 39 languages, including हिन्दी, தமிழ், తెలుగు,
+         മലയാളം, ಕನ್ನಡ, Español, Français, Deutsch and more
+       • Offline backup & restore — and your data never leaves your phone
        • No account, no sign-up, free forever
 
        Small and daily beats big and rare. Light your first ember today.
