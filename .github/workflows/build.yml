@@ -45,6 +45,13 @@ jobs:
       - name: Generate app icons
         run: dart run flutter_launcher_icons
 
+      - name: Add native home-screen widget files
+        run: |
+          if [ -d android_extras/app/src/main ]; then
+            cp -r android_extras/app/src/main/. android/app/src/main/
+            echo "Widget native files copied."
+          fi
+
       - name: Prepare signing key
         run: |
           mkdir -p "$HOME/keys"
@@ -104,6 +111,36 @@ jobs:
               assert '</application>' in mf, 'manifest missing </application>'
               mf = mf.replace('</application>', meta + '    </application>')
           mf = mf.replace('android:label="ember_habits"', 'android:label="Ember"')
+
+          # permissions (notifications + reschedule after reboot)
+          perms = ('    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>\n'
+                   '    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>\n'
+                   '    <uses-permission android:name="android.permission.VIBRATE"/>\n')
+          if 'POST_NOTIFICATIONS' not in mf:
+              mf = mf.replace('<application', perms + '    <application', 1)
+
+          # receivers: home-screen widget + scheduled notifications
+          receivers = (
+              '        <receiver android:name=".EmberWidgetProvider" android:exported="false">\n'
+              '            <intent-filter>\n'
+              '                <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>\n'
+              '            </intent-filter>\n'
+              '            <meta-data android:name="android.appwidget.provider"\n'
+              '                android:resource="@xml/ember_widget_info"/>\n'
+              '        </receiver>\n'
+              '        <receiver android:exported="false"\n'
+              '            android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver"/>\n'
+              '        <receiver android:exported="false"\n'
+              '            android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver">\n'
+              '            <intent-filter>\n'
+              '                <action android:name="android.intent.action.BOOT_COMPLETED"/>\n'
+              '                <action android:name="android.intent.action.MY_PACKAGE_REPLACED"/>\n'
+              '                <action android:name="android.intent.action.QUICKBOOT_POWERON"/>\n'
+              '            </intent-filter>\n'
+              '        </receiver>\n')
+          if 'EmberWidgetProvider' not in mf:
+              mf = mf.replace('</application>', receivers + '    </application>')
+
           open(mf_path, 'w').write(mf)
           print('Manifest OK ->', app_id)
 
@@ -116,6 +153,12 @@ jobs:
 
           g = g.replace('minSdk = flutter.minSdkVersion', 'minSdk = 23')
           g = g.replace('minSdkVersion flutter.minSdkVersion', 'minSdkVersion 23')
+
+          # plugins (ads, notifications, widget) need NDK 27
+          g = g.replace('ndkVersion = flutter.ndkVersion',
+                        'ndkVersion = "27.0.12077973"')
+          g = g.replace('ndkVersion flutter.ndkVersion',
+                        'ndkVersion "27.0.12077973"')
 
           if is_kts:
               imports = 'import java.io.FileInputStream\nimport java.util.Properties\n\n'
@@ -161,16 +204,39 @@ jobs:
               old_ref = 'signingConfigs.debug'
               new_ref = 'signingConfigs.release'
 
-          m = re.search(r'^android\s*\{', g, flags=re.M)
-          assert m, 'could not find android { block in ' + path
-          g = g[:m.start()] + props + g[m.start():]
+          if 'keystoreProperties' not in g:
+              m = re.search(r'^android\s*\{', g, flags=re.M)
+              assert m, 'could not find android { block in ' + path
+              g = g[:m.start()] + props + g[m.start():]
 
-          m = re.search(r'^\s*buildTypes\s*\{', g, flags=re.M)
-          assert m, 'could not find buildTypes { block in ' + path
-          g = g[:m.start()] + signing + g[m.start():]
+              m = re.search(r'^\s*buildTypes\s*\{', g, flags=re.M)
+              assert m, 'could not find buildTypes { block in ' + path
+              g = g[:m.start()] + signing + g[m.start():]
 
-          assert old_ref in g, 'could not find debug signing reference in ' + path
-          g = g.replace(old_ref, new_ref)
+              assert old_ref in g, 'could not find debug signing reference in ' + path
+              g = g.replace(old_ref, new_ref)
+
+          # ---------- 3. Core library desugaring (needed by notifications) ----------
+          if 'coreLibraryDesugaring' not in g:
+              if is_kts:
+                  anchor = 'targetCompatibility = JavaVersion.VERSION_11'
+                  if anchor in g:
+                      g = g.replace(anchor,
+                          anchor + '\n        isCoreLibraryDesugaringEnabled = true')
+                  else:
+                      m2 = re.search(r'compileOptions\s*\{', g)
+                      assert m2, 'no compileOptions block found'
+                      g = g[:m2.end()] + '\n        isCoreLibraryDesugaringEnabled = true' + g[m2.end():]
+                  g += ('\n\ndependencies {\n'
+                        '    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")\n'
+                        '}\n')
+              else:
+                  m2 = re.search(r'compileOptions\s*\{', g)
+                  if m2:
+                      g = g[:m2.end()] + '\n        coreLibraryDesugaringEnabled true' + g[m2.end():]
+                  g += ('\n\ndependencies {\n'
+                        '    coreLibraryDesugaring "com.android.tools:desugar_jdk_libs:2.1.4"\n'
+                        '}\n')
 
           open(path, 'w').write(g)
           print('Gradle OK ->', path)
