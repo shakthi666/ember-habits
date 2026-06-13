@@ -56,6 +56,15 @@ class StatsScreen extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 16),
+              if (store.active.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 48),
+                  child: Text(
+                    L10n.t('emptyTitle'),
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: p.muted, fontSize: 14),
+                  ),
+                ),
               for (final h in store.active)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 10),

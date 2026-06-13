@@ -72,6 +72,31 @@ class SettingsScreen extends StatelessWidget {
                     style: TextStyle(color: p.ink)),
                 onTap: () => _importDialog(context, p),
               ),
+              ListTile(
+                leading: Icon(Icons.privacy_tip_outlined,
+                    color: p.accentDeep),
+                title: Text(L10n.t('privacy'),
+                    style: TextStyle(color: p.ink)),
+                onTap: () => showDialog<void>(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    backgroundColor: p.card,
+                    title: Text(L10n.t('privacy'),
+                        style: TextStyle(color: p.ink, fontSize: 18)),
+                    content: SelectableText(
+                      'https://shakthi666.github.io/ember-habits/',
+                      style: TextStyle(color: p.accentDeep),
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.of(ctx).pop(),
+                        child: Text('OK',
+                            style: TextStyle(color: p.accentDeep)),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ]),
             const SizedBox(height: 14),
             if (store.archivedHabits.isNotEmpty)
@@ -88,10 +113,21 @@ class SettingsScreen extends StatelessWidget {
                   ListTile(
                     leading: Icon(h.icon, color: p.muted),
                     title: Text(h.name, style: TextStyle(color: p.ink)),
-                    trailing: TextButton(
-                      onPressed: () => store.setArchived(h, false),
-                      child: Text(L10n.t('unarchive'),
-                          style: TextStyle(color: p.accentDeep)),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        TextButton(
+                          onPressed: () => store.setArchived(h, false),
+                          child: Text(L10n.t('unarchive'),
+                              style: TextStyle(color: p.accentDeep)),
+                        ),
+                        IconButton(
+                          tooltip: L10n.t('delete'),
+                          icon: const Icon(Icons.delete_outline,
+                              color: Colors.red, size: 20),
+                          onPressed: () => store.remove(h),
+                        ),
+                      ],
                     ),
                   ),
               ]),

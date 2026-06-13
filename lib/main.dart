@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 
 import 'ads.dart';
+import 'brand.dart';
 import 'detail.dart';
 import 'edit_sheet.dart';
 import 'habits.dart';
@@ -38,6 +39,11 @@ class EmberApp extends StatelessWidget {
         themeMode: store.themeMode,
         theme: emberTheme(Brightness.light),
         darkTheme: emberTheme(Brightness.dark),
+        builder: (context, child) => Directionality(
+          textDirection:
+              L10n.code == 'ur' ? TextDirection.rtl : TextDirection.ltr,
+          child: child ?? const SizedBox.shrink(),
+        ),
         home: const HomeScreen(),
       ),
     );
@@ -63,16 +69,29 @@ class HomeScreen extends StatelessWidget {
 
         return Scaffold(
           appBar: AppBar(
-            title: Text('Ember',
-                style: TextStyle(fontWeight: FontWeight.w700, color: p.ink)),
+            titleSpacing: 20,
+            title: Row(
+              children: [
+                const EmberLogo(size: 34),
+                const SizedBox(width: 11),
+                Text('Ember',
+                    style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 22,
+                        letterSpacing: -0.4,
+                        color: p.ink)),
+              ],
+            ),
             actions: [
               IconButton(
+                tooltip: L10n.t('yourProgress'),
                 icon: Icon(Icons.bar_chart, color: p.muted),
                 onPressed: () => Navigator.of(context).push(
                   MaterialPageRoute(builder: (_) => const StatsScreen()),
                 ),
               ),
               IconButton(
+                tooltip: L10n.t('settings'),
                 icon: Icon(Icons.settings_outlined, color: p.muted),
                 onPressed: () => Navigator.of(context).push(
                   MaterialPageRoute(builder: (_) => const SettingsScreen()),
@@ -169,9 +188,9 @@ class _ProgressRing extends StatelessWidget {
           width: 46,
           height: 46,
           child: Center(
-            child: Text('${(v * 100).round()}',
+            child: Text('${(v * 100).round()}%',
                 style: TextStyle(
-                    fontSize: 12,
+                    fontSize: 11,
                     fontWeight: FontWeight.w700,
                     color: p.ink)),
           ),
@@ -309,8 +328,11 @@ class _HabitCard extends StatelessWidget {
     final streak = habit.currentStreak;
     final now = DateTime.now();
 
+    final settled = done && due;
     return Material(
-      color: p.card,
+      color: settled
+          ? Color.alphaBlend(accent.withValues(alpha: 0.05), p.card)
+          : p.card,
       borderRadius: BorderRadius.circular(16),
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
@@ -320,7 +342,10 @@ class _HabitCard extends StatelessWidget {
         onLongPress: () => _showMenu(context, p),
         child: Container(
           decoration: BoxDecoration(
-            border: Border.all(color: p.cardBorder),
+            border: Border.all(
+                color: settled
+                    ? accent.withValues(alpha: 0.30)
+                    : p.cardBorder),
             borderRadius: BorderRadius.circular(16),
           ),
           padding: const EdgeInsets.all(14),
@@ -351,27 +376,28 @@ class _HabitCard extends StatelessWidget {
                     const SizedBox(height: 5),
                     Row(
                       children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: p.chipBg,
-                            borderRadius: BorderRadius.circular(999),
+                        if (streak > 0)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: p.chipBg,
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.local_fire_department,
+                                    size: 13, color: p.chipText),
+                                const SizedBox(width: 3),
+                                Text('$streak ${L10n.t('days')}',
+                                    style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                        color: p.chipText)),
+                              ],
+                            ),
                           ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.local_fire_department,
-                                  size: 13, color: p.chipText),
-                              const SizedBox(width: 3),
-                              Text('$streak ${L10n.t('days')}',
-                                  style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w600,
-                                      color: p.chipText)),
-                            ],
-                          ),
-                        ),
                         if (!due) ...[
                           const SizedBox(width: 6),
                           Container(
@@ -417,7 +443,9 @@ class _HabitCard extends StatelessWidget {
                                 border: dDue
                                     ? null
                                     : Border.all(
-                                        color: p.empty, width: 1.5),
+                                        color: p.muted.withValues(
+                                            alpha: 0.35),
+                                        width: 1.5),
                               ),
                             );
                           }),
@@ -522,13 +550,17 @@ class _CheckButton extends StatelessWidget {
     void act() {
       HapticFeedback.lightImpact();
       final completedNow = store.checkIn(habit);
-      if (completedNow) {
+      // Never cover the all-done celebration with an ad.
+      if (completedNow && !store.allDoneToday) {
         InterstitialManager.instance.registerAction();
       }
     }
 
     if (habit.isCounter) {
-      return InkWell(
+      return Semantics(
+        button: true,
+        label: '${habit.name} ${habit.countToday}/${habit.target}',
+        child: InkWell(
         borderRadius: BorderRadius.circular(999),
         onTap: act,
         onLongPress: () => store.decrementToday(habit),
@@ -538,8 +570,8 @@ class _CheckButton extends StatelessWidget {
           builder: (context, v, child) =>
               Transform.scale(scale: v, child: child),
           child: Container(
-            width: 52,
-            height: 44,
+            width: 56,
+            height: 48,
             alignment: Alignment.center,
             decoration: BoxDecoration(
               color: done ? accent : Colors.transparent,
@@ -557,23 +589,35 @@ class _CheckButton extends StatelessWidget {
             ),
           ),
         ),
-      );
+      ));
     }
 
-    return InkWell(
-      borderRadius: BorderRadius.circular(999),
-      onTap: act,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        width: 36,
-        height: 36,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: done ? accent : Colors.transparent,
-          border: done ? null : Border.all(color: accent, width: 2),
+    return Semantics(
+      button: true,
+      label: habit.name,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(999),
+        onTap: act,
+        child: SizedBox(
+          width: 48,
+          height: 48,
+          child: Center(
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: done ? accent : Colors.transparent,
+                border:
+                    done ? null : Border.all(color: accent, width: 2),
+              ),
+              child: done
+                  ? Icon(Icons.check, size: 20, color: p.onAccent)
+                  : null,
+            ),
+          ),
         ),
-        child:
-            done ? Icon(Icons.check, size: 20, color: p.onAccent) : null,
       ),
     );
   }

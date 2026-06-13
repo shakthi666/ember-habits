@@ -37,7 +37,7 @@ class EmberPalette {
     card: Color(0xFFFFFFFF),
     cardBorder: Color(0xFFE7E0F5),
     ink: Color(0xFF2B2440),
-    muted: Color(0xFF8B82A6),
+    muted: Color(0xFF6F678C),
     accent: Color(0xFF7C5CFC),
     accentDeep: Color(0xFF5B3FD4),
     onAccent: Color(0xFFFFFFFF),

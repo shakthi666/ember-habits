@@ -16,82 +16,102 @@ Future<void> showHabitSheet(BuildContext context, {Habit? existing}) {
   var target = existing == null || existing.target < 2 ? 3 : existing.target;
   var reminder = existing?.reminderMinutes ?? -1;
 
+  Color accent() => habitColors[colorIndex][b == Brightness.dark ? 1 : 0];
+
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     backgroundColor: p.card,
     shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
     ),
     builder: (ctx) => StatefulBuilder(
       builder: (ctx, setSheet) {
-        Widget sectionLabel(String s) => Padding(
-              padding: const EdgeInsets.only(top: 16, bottom: 8),
-              child: Text(s,
-                  style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: p.muted)),
+        Widget label(String key) => Padding(
+              padding: const EdgeInsets.only(top: 24, bottom: 10),
+              child: Text(
+                L10n.t(key).toUpperCase(),
+                style: TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 1.3,
+                    color: p.muted),
+              ),
             );
 
         return Padding(
           padding: EdgeInsets.only(
-              left: 20,
-              right: 20,
-              top: 20,
-              bottom: 20 + MediaQuery.of(ctx).viewInsets.bottom),
+              left: 24,
+              right: 24,
+              bottom: 24 + MediaQuery.of(ctx).viewInsets.bottom),
           child: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                Center(
+                  child: Container(
+                    margin: const EdgeInsets.only(top: 12, bottom: 18),
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: p.empty,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
                 Text(
                     existing == null
                         ? L10n.t('newHabit')
                         : L10n.t('editHabit'),
                     style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w700,
+                        fontSize: 22,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.3,
                         color: p.ink)),
-                const SizedBox(height: 14),
+                const SizedBox(height: 16),
                 TextField(
                   controller: controller,
                   autofocus: existing == null,
                   maxLength: 40,
-                  style: TextStyle(color: p.ink),
+                  style: TextStyle(
+                      color: p.ink,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w500),
                   decoration: InputDecoration(
                     hintText: L10n.t('habitNameHint'),
-                    hintStyle: TextStyle(color: p.muted),
+                    hintStyle:
+                        TextStyle(color: p.muted, fontWeight: FontWeight.w400),
                     counterText: '',
                     filled: true,
                     fillColor: p.bg,
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 18, vertical: 16),
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(14),
+                      borderRadius: BorderRadius.circular(16),
                       borderSide: BorderSide.none,
                     ),
                   ),
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 18),
                 Wrap(
-                  spacing: 9,
-                  runSpacing: 9,
+                  spacing: 13,
+                  runSpacing: 13,
                   children: [
                     for (var i = 0; i < habitIcons.length; i++)
                       InkWell(
                         borderRadius: BorderRadius.circular(999),
                         onTap: () => setSheet(() => iconIndex = i),
-                        child: Container(
-                          width: 42,
-                          height: 42,
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 150),
+                          width: 48,
+                          height: 48,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            color: iconIndex == i
-                                ? habitColors[colorIndex][
-                                    b == Brightness.dark ? 1 : 0]
-                                : p.soft,
+                            color: iconIndex == i ? accent() : p.soft,
                           ),
                           child: Icon(habitIcons[i],
-                              size: 21,
+                              size: 22,
                               color: iconIndex == i
                                   ? p.onAccent
                                   : p.accentDeep),
@@ -99,65 +119,39 @@ Future<void> showHabitSheet(BuildContext context, {Habit? existing}) {
                       ),
                   ],
                 ),
-                sectionLabel(L10n.t('color')),
-                Row(
+                label('color'),
+                Wrap(
+                  spacing: 14,
+                  runSpacing: 12,
                   children: [
                     for (var i = 0; i < habitColors.length; i++)
-                      Padding(
-                        padding: const EdgeInsets.only(right: 10),
-                        child: InkWell(
-                          borderRadius: BorderRadius.circular(999),
-                          onTap: () => setSheet(() => colorIndex = i),
-                          child: Container(
-                            width: 30,
-                            height: 30,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: habitColors[i]
-                                  [b == Brightness.dark ? 1 : 0],
-                              border: colorIndex == i
-                                  ? Border.all(color: p.ink, width: 3)
-                                  : null,
-                            ),
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-                sectionLabel(L10n.t('schedule')),
-                Row(
-                  children: [
-                    for (var d = 1; d <= 7; d++)
-                      Padding(
-                        padding: const EdgeInsets.only(right: 8),
-                        child: InkWell(
-                          borderRadius: BorderRadius.circular(999),
-                          onTap: () => setSheet(() {
-                            if (schedule.contains(d)) {
-                              if (schedule.length > 1) schedule.remove(d);
-                            } else {
-                              schedule.add(d);
-                            }
-                          }),
-                          child: Container(
-                            width: 36,
-                            height: 36,
-                            alignment: Alignment.center,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: schedule.contains(d)
-                                  ? habitColors[colorIndex]
-                                      [b == Brightness.dark ? 1 : 0]
-                                  : p.soft,
-                            ),
-                            child: Text(
-                              L10n.weekdayShort[d - 1],
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w700,
-                                color: schedule.contains(d)
-                                    ? p.onAccent
-                                    : p.accentDeep,
+                      InkWell(
+                        borderRadius: BorderRadius.circular(999),
+                        onTap: () => setSheet(() => colorIndex = i),
+                        child: SizedBox(
+                          width: 48,
+                          height: 48,
+                          child: Center(
+                            child: Container(
+                              width: 38,
+                              height: 38,
+                              padding: const EdgeInsets.all(3),
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: colorIndex == i
+                                      ? habitColors[i]
+                                          [b == Brightness.dark ? 1 : 0]
+                                      : Colors.transparent,
+                                  width: 2.5,
+                                ),
+                              ),
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: habitColors[i]
+                                      [b == Brightness.dark ? 1 : 0],
+                                ),
                               ),
                             ),
                           ),
@@ -165,25 +159,77 @@ Future<void> showHabitSheet(BuildContext context, {Habit? existing}) {
                       ),
                   ],
                 ),
-                sectionLabel(L10n.t('habitType')),
+                label('schedule'),
                 Row(
                   children: [
-                    ChoiceChip(
-                      label: Text(L10n.t('simpleCheck')),
-                      selected: !isCounter,
-                      onSelected: (_) => setSheet(() => isCounter = false),
-                    ),
-                    const SizedBox(width: 8),
-                    ChoiceChip(
-                      label: Text(L10n.t('counter')),
-                      selected: isCounter,
-                      onSelected: (_) => setSheet(() => isCounter = true),
-                    ),
+                    for (var d = 1; d <= 7; d++) ...[
+                      Expanded(
+                        child: AspectRatio(
+                          aspectRatio: 1,
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(999),
+                            onTap: () => setSheet(() {
+                              if (schedule.contains(d)) {
+                                if (schedule.length > 1) schedule.remove(d);
+                              } else {
+                                schedule.add(d);
+                              }
+                            }),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 150),
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: schedule.contains(d)
+                                    ? accent()
+                                    : p.soft,
+                              ),
+                              child: Text(
+                                L10n.weekdayShort[d - 1],
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                  color: schedule.contains(d)
+                                      ? p.onAccent
+                                      : p.accentDeep,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      if (d < 7) const SizedBox(width: 8),
+                    ],
                   ],
+                ),
+                label('habitType'),
+                Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: p.bg,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Row(
+                    children: [
+                      _SegPill(
+                          text: L10n.t('simpleCheck'),
+                          selected: !isCounter,
+                          accent: accent(),
+                          p: p,
+                          onTap: () => setSheet(() => isCounter = false)),
+                      const SizedBox(width: 4),
+                      _SegPill(
+                          text: L10n.t('counter'),
+                          selected: isCounter,
+                          accent: accent(),
+                          p: p,
+                          onTap: () => setSheet(() => isCounter = true)),
+                    ],
+                  ),
                 ),
                 if (isCounter)
                   Padding(
-                    padding: const EdgeInsets.only(top: 10),
+                    padding: const EdgeInsets.only(top: 12),
                     child: Row(
                       children: [
                         IconButton(
@@ -192,29 +238,37 @@ Future<void> showHabitSheet(BuildContext context, {Habit? existing}) {
                           icon: Icon(Icons.remove_circle_outline,
                               color: p.muted),
                         ),
-                        Text('$target',
-                            style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w700,
-                                color: p.ink)),
+                        SizedBox(
+                          width: 44,
+                          child: Center(
+                            child: Text('$target',
+                                style: TextStyle(
+                                    fontSize: 19,
+                                    fontWeight: FontWeight.w800,
+                                    color: p.ink)),
+                          ),
+                        ),
                         IconButton(
                           onPressed: () => setSheet(
                               () => target = (target + 1).clamp(2, 99)),
                           icon: Icon(Icons.add_circle_outline,
                               color: p.muted),
                         ),
-                        Text(L10n.t('timesPerDay'),
-                            style: TextStyle(color: p.muted, fontSize: 13)),
+                        const SizedBox(width: 4),
+                        Flexible(
+                          child: Text(L10n.t('timesPerDay'),
+                              style:
+                                  TextStyle(color: p.muted, fontSize: 13)),
+                        ),
                       ],
                     ),
                   ),
-                sectionLabel(L10n.t('reminder')),
+                label('reminder'),
                 Row(
                   children: [
                     Switch(
                       value: reminder >= 0,
-                      activeColor:
-                          habitColors[colorIndex][b == Brightness.dark ? 1 : 0],
+                      activeColor: accent(),
                       onChanged: (v) async {
                         if (v) {
                           await ensureNotificationPermission();
@@ -224,10 +278,10 @@ Future<void> showHabitSheet(BuildContext context, {Habit? existing}) {
                         }
                       },
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 12),
                     if (reminder >= 0)
                       InkWell(
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(12),
                         onTap: () async {
                           final t = await showTimePicker(
                             context: ctx,
@@ -242,62 +296,71 @@ Future<void> showHabitSheet(BuildContext context, {Habit? existing}) {
                         },
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 6),
+                              horizontal: 16, vertical: 8),
                           decoration: BoxDecoration(
                             color: p.soft,
-                            borderRadius: BorderRadius.circular(10),
+                            borderRadius: BorderRadius.circular(12),
                           ),
                           child: Text(
                             '${(reminder ~/ 60).toString().padLeft(2, '0')}:${(reminder % 60).toString().padLeft(2, '0')}',
                             style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700,
+                                fontSize: 17,
+                                fontWeight: FontWeight.w800,
                                 color: p.accentDeep),
                           ),
                         ),
                       )
                     else
                       Text(L10n.t('reminderOff'),
-                          style: TextStyle(color: p.muted)),
+                          style: TextStyle(color: p.muted, fontSize: 14)),
                   ],
                 ),
-                const SizedBox(height: 18),
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton(
-                    style: FilledButton.styleFrom(
-                      backgroundColor: habitColors[colorIndex]
-                          [b == Brightness.dark ? 1 : 0],
-                      foregroundColor: p.onAccent,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(999)),
-                    ),
-                    onPressed: () {
-                      final name = controller.text.trim();
-                      if (name.isEmpty) return;
-                      final h = existing ??
-                          Habit(
-                              id: DateTime.now()
-                                  .microsecondsSinceEpoch
-                                  .toString(),
-                              name: name);
-                      h.name = name;
-                      h.iconIndex = iconIndex;
-                      h.colorIndex = colorIndex;
-                      h.scheduleDays = schedule;
-                      h.target = isCounter ? target : 1;
-                      h.reminderMinutes = reminder;
-                      store.addOrUpdate(h);
-                      Navigator.of(ctx).pop();
-                    },
-                    child: Text(
-                        existing == null
-                            ? L10n.t('createHabit')
-                            : L10n.t('saveHabit'),
-                        style: const TextStyle(
-                            fontSize: 15, fontWeight: FontWeight.w600)),
-                  ),
+                const SizedBox(height: 26),
+                ValueListenableBuilder<TextEditingValue>(
+                  valueListenable: controller,
+                  builder: (context, value, _) {
+                    final canSave = value.text.trim().isNotEmpty;
+                    return SizedBox(
+                      width: double.infinity,
+                      height: 56,
+                      child: FilledButton(
+                        style: FilledButton.styleFrom(
+                          backgroundColor: accent(),
+                          foregroundColor: p.onAccent,
+                          disabledBackgroundColor: p.empty,
+                          disabledForegroundColor: p.muted,
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(999)),
+                        ),
+                        onPressed: !canSave
+                            ? null
+                            : () {
+                                final name = controller.text.trim();
+                                final h = existing ??
+                                    Habit(
+                                        id: DateTime.now()
+                                            .microsecondsSinceEpoch
+                                            .toString(),
+                                        name: name);
+                                h.name = name;
+                                h.iconIndex = iconIndex;
+                                h.colorIndex = colorIndex;
+                                h.scheduleDays = schedule;
+                                h.target = isCounter ? target : 1;
+                                h.reminderMinutes = reminder;
+                                store.addOrUpdate(h);
+                                Navigator.of(ctx).pop();
+                              },
+                        child: Text(
+                            existing == null
+                                ? L10n.t('createHabit')
+                                : L10n.t('saveHabit'),
+                            style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700)),
+                      ),
+                    );
+                  },
                 ),
               ],
             ),
@@ -306,4 +369,47 @@ Future<void> showHabitSheet(BuildContext context, {Habit? existing}) {
       },
     ),
   );
+}
+
+class _SegPill extends StatelessWidget {
+  final String text;
+  final bool selected;
+  final Color accent;
+  final EmberPalette p;
+  final VoidCallback onTap;
+  const _SegPill(
+      {required this.text,
+      required this.selected,
+      required this.accent,
+      required this.p,
+      required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: InkWell(
+        borderRadius: BorderRadius.circular(999),
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          padding: const EdgeInsets.symmetric(vertical: 11),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: selected ? accent : Colors.transparent,
+            borderRadius: BorderRadius.circular(999),
+          ),
+          child: Text(
+            text,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 13.5,
+              fontWeight: FontWeight.w700,
+              color: selected ? p.onAccent : p.muted,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
