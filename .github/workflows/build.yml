@@ -11,9 +11,9 @@
 name: Build Ember (Play Store files)
 
 on:
-  workflow_dispatch:
+  workflow_dispatch
   push:
-    branches: [main, master]
+    branches: [main, master
 
 jobs:
   build:
@@ -39,7 +39,7 @@ jobs:
 
       - name: Generate Android project files
         run: |
-          flutter create --platforms android --org com.shakthi --project-name ember_habits .
+                  flutter create --platforms android --org com.Ember --project-name myapp .
           flutter pub get
 
       - name: Generate app icons
