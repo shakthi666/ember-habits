@@ -39,7 +39,7 @@ jobs:
 
       - name: Generate Android project files
         run: |
-                  flutter create --platforms android --org com.Ember --project-name myapp .
+          flutter create --platforms android --org com.Ember --project-name myapp .
           flutter pub get
 
       - name: Generate app icons
