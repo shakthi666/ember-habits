@@ -376,6 +376,19 @@ class HabitStore extends ChangeNotifier {
     notifyListeners();
   }
 
+  bool setTodayCount(Habit h, int value) {
+    final k = dateKey(DateTime.now());
+    final before = h.doneToday;
+    if (value <= 0) {
+      h.dayCounts.remove(k);
+    } else {
+      h.dayCounts[k] = value;
+    }
+    save();
+    notifyListeners();
+    return !before && h.doneToday;
+  }
+
   int get dueTodayCount => active.where((h) => h.dueToday).length;
 
   int get doneTodayCount =>
