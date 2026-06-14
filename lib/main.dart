@@ -367,7 +367,7 @@ class _HabitCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(habit.name,
-                        maxLines: 1,
+                        maxLines:2,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                             fontSize: 15,
