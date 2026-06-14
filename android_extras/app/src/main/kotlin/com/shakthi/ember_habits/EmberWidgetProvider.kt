@@ -1,4 +1,4 @@
-package com.shakthi.ember_habits
+package com.Ember.myapp
 
 import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
