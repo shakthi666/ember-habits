@@ -110,7 +110,7 @@ jobs:
           if 'com.google.android.gms.ads.APPLICATION_ID' not in mf:
               assert '</application>' in mf, 'manifest missing </application>'
               mf = mf.replace('</application>', meta + '    </application>')
-          mf = mf.replace('android:label="ember_habits"', 'android:label="Ember"')
+          mf = mf.replace('android:label="myapp"', 'android:label="Ember"')
 
           # permissions (notifications + reschedule after reboot)
           perms = ('    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>\n'
