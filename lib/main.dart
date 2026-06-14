@@ -244,12 +244,12 @@ class _CelebrationCard extends StatelessWidget {
         width: double.infinity,
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: p.chipBg,
-          borderRadius: BorderRadius.circular(16),
+gradient: LinearGradient(colors: [p.accent, p.accentDeep], begin: Alignment.topLeft, end: Alignment.bottomRight),
+          boxShadow: [BoxShadow(color: p.accent.withOpacity(0.35), blurRadius: 16, offset: const Offset(0, 6))],borderRadius: BorderRadius.circular(16),
         ),
         child: Row(
           children: [
-            Icon(Icons.local_fire_department, color: p.chipText, size: 28),
+            Icon(Icons.local_fire_department, color: p.onAccent, size: 28),
             const SizedBox(width: 10),
             Expanded(
               child: Column(
@@ -259,10 +259,10 @@ class _CelebrationCard extends StatelessWidget {
                       style: TextStyle(
                           fontWeight: FontWeight.w700,
                           fontSize: 14,
-                          color: p.chipText)),
+                          color: p.onAccent)),
                   Text(L10n.t('allDoneSub'),
                       style:
-                          TextStyle(fontSize: 12, color: p.chipText)),
+                          TextStyle(fontSize: 12, color: p.onAccent)),
                 ],
               ),
             ),
@@ -556,13 +556,45 @@ class _CheckButton extends StatelessWidget {
       }
     }
 
+    void promptCount() {
+      final ctrl = TextEditingController(text: habit.countToday > 0 ? '${habit.countToday}' : '');
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: p.card,
+          title: Text(habit.name, style: TextStyle(color: p.ink)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(L10n.f('targetIs', [habit.target]), style: TextStyle(color: p.muted, fontSize: 13)),
+              const SizedBox(height: 8),
+              TextField(controller: ctrl, autofocus: true, keyboardType: TextInputType.number, style: TextStyle(color: p.ink), decoration: InputDecoration(hintText: L10n.t('amountHint'), hintStyle: TextStyle(color: p.muted))),
+              ],
+            ),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(ctx).pop(), child: Text(L10n.t('cancel'), style: TextStyle(color: p.muted))),
+            TextButton(onPressed: () {
+              final v = int.tryParse(ctrl.text.trim()) ?? 0;
+              final completedNow = store.setTodayCount(habit, v);
+              Navigator.of(ctx).pop();
+              HapticFeedback.lightImpact();
+              if (completedNow && !store.allDoneToday) {
+                InterstitialManager.instance.registerAction();
+              }
+            }, child: Text(L10n.t('saveCount'), style: TextStyle(color: accent, fontWeight: FontWeight.w700))),
+            ],
+          ),
+        );
+    }
+
     if (habit.isCounter) {
       return Semantics(
         button: true,
         label: '${habit.name} ${habit.countToday}/${habit.target}',
         child: InkWell(
         borderRadius: BorderRadius.circular(999),
-        onTap: act,
+        onTap: promptCount,
         onLongPress: () => store.decrementToday(habit),
         child: TweenAnimationBuilder<double>(
           tween: Tween(begin: 1, end: done ? 1.08 : 1),
