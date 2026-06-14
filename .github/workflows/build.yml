@@ -11,9 +11,9 @@
 name: Build Ember (Play Store files)
 
 on:
-  workflow_dispatch
+  workflow_dispatch:
   push:
-    branches: [main, master
+    branches: [main, master]
 
 jobs:
   build:
