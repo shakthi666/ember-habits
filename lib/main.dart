@@ -622,8 +622,15 @@ class _CheckButton extends StatelessWidget {
             : '${habit.name} ${habit.countToday}/${habit.target}',
         child: InkWell(
           borderRadius: BorderRadius.circular(999),
-          onTap: promptCount,
-          onLongPress: () => store.decrementToday(habit),
+          // Tap increments by one; long-press to type an exact value.
+          onTap: () {
+            HapticFeedback.lightImpact();
+            final completedNow = store.checkIn(habit);
+            if (completedNow && !store.allDoneToday) {
+              InterstitialManager.instance.registerAction();
+            }
+          },
+          onLongPress: promptCount,
           // Past the target: badge the surplus so it reads as a bonus,
           // not a bug. Uses the warm "ember" chip colors.
           child: over > 0

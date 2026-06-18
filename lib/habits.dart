@@ -46,7 +46,10 @@ class Habit {
   int colorIndex;
   Set<int> scheduleDays; // DateTime.weekday values 1(Mon)..7(Sun)
   int target; // 1 = simple check habit, >1 = counter habit
-  int reminderMinutes; // -1 = off, else minutes since midnight
+  int reminderMinutes; // -1 = off, else minutes since midnight (single daily)
+  int reminderEveryMinutes; // 0 = off, else repeat every N min within window
+  int reminderStartMinutes; // reminder window start (minutes since midnight)
+  int reminderEndMinutes; // reminder window end (minutes since midnight)
   bool archived;
   Map<String, int> dayCounts; // dateKey -> count done that day
   Set<String> skippedDays;
@@ -59,6 +62,9 @@ class Habit {
     Set<int>? scheduleDays,
     this.target = 1,
     this.reminderMinutes = -1,
+    this.reminderEveryMinutes = 0,
+    this.reminderStartMinutes = 8 * 60,
+    this.reminderEndMinutes = 22 * 60,
     this.archived = false,
     Map<String, int>? dayCounts,
     Set<String>? skippedDays,
@@ -74,6 +80,9 @@ class Habit {
         'sched': scheduleDays.toList(),
         'target': target,
         'rem': reminderMinutes,
+        'every': reminderEveryMinutes,
+        'rstart': reminderStartMinutes,
+        'rend': reminderEndMinutes,
         'arch': archived,
         'counts': dayCounts,
         'skips': skippedDays.toList(),
@@ -101,6 +110,9 @@ class Habit {
           .toSet(),
       target: (j['target'] as num?)?.toInt() ?? 1,
       reminderMinutes: (j['rem'] as num?)?.toInt() ?? -1,
+      reminderEveryMinutes: (j['every'] as num?)?.toInt() ?? 0,
+      reminderStartMinutes: (j['rstart'] as num?)?.toInt() ?? 8 * 60,
+      reminderEndMinutes: (j['rend'] as num?)?.toInt() ?? 22 * 60,
       archived: j['arch'] == true,
       dayCounts: counts,
       skippedDays: ((j['skips'] as List?) ?? const [])

@@ -41,41 +41,70 @@ Future<bool> ensureNotificationPermission() async {
 
 int _idFor(Habit h) => h.id.hashCode & 0x7fffffff;
 
+const int _maxSlots = 48;
+
+/// Stable per-slot id for interval reminders (one notification per time slot).
+int _slotId(Habit h, int i) => ('${h.id}#$i').hashCode & 0x7fffffff;
+
 Future<void> cancelReminder(Habit h) async {
   if (!_ready) return;
   try {
     await _plugin.cancel(_idFor(h));
+    for (var i = 0; i < _maxSlots; i++) {
+      await _plugin.cancel(_slotId(h, i));
+    }
   } catch (_) {}
+}
+
+/// Schedule one notification that repeats daily at [minutes] past midnight.
+Future<void> _scheduleDaily(int id, Habit h, int minutes) async {
+  final now = tz.TZDateTime.now(tz.local);
+  var when = tz.TZDateTime(
+      tz.local, now.year, now.month, now.day, minutes ~/ 60, minutes % 60);
+  if (!when.isAfter(now)) when = when.add(const Duration(days: 1));
+  await _plugin.zonedSchedule(
+    id,
+    '${L10n.t('reminderTitle')} ${h.name}',
+    L10n.t('reminderBody'),
+    when,
+    const NotificationDetails(
+      android: AndroidNotificationDetails(
+        'ember_reminders',
+        'Habit reminders',
+        channelDescription: 'Gentle daily reminders for your habits',
+        importance: Importance.defaultImportance,
+        priority: Priority.defaultPriority,
+      ),
+    ),
+    androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+    uiLocalNotificationDateInterpretation:
+        UILocalNotificationDateInterpretation.absoluteTime,
+    matchDateTimeComponents: DateTimeComponents.time,
+  );
 }
 
 Future<void> scheduleReminder(Habit h) async {
   if (!_ready) return;
   await cancelReminder(h);
-  if (h.reminderMinutes < 0 || h.archived) return;
+  if (h.archived) return;
   try {
-    final now = tz.TZDateTime.now(tz.local);
-    var when = tz.TZDateTime(tz.local, now.year, now.month, now.day,
-        h.reminderMinutes ~/ 60, h.reminderMinutes % 60);
-    if (!when.isAfter(now)) when = when.add(const Duration(days: 1));
-    await _plugin.zonedSchedule(
-      _idFor(h),
-      '${L10n.t('reminderTitle')} ${h.name}',
-      L10n.t('reminderBody'),
-      when,
-      const NotificationDetails(
-        android: AndroidNotificationDetails(
-          'ember_reminders',
-          'Habit reminders',
-          channelDescription: 'Gentle daily reminders for your habits',
-          importance: Importance.defaultImportance,
-          priority: Priority.defaultPriority,
-        ),
-      ),
-      androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
-      uiLocalNotificationDateInterpretation:
-          UILocalNotificationDateInterpretation.absoluteTime,
-      matchDateTimeComponents: DateTimeComponents.time,
-    );
+    // Interval mode: one repeating notification per slot across the window.
+    if (h.reminderEveryMinutes > 0) {
+      final step = h.reminderEveryMinutes;
+      final start = h.reminderStartMinutes;
+      final end =
+          h.reminderEndMinutes >= start ? h.reminderEndMinutes : start;
+      var slot = 0;
+      for (var m = start; m <= end && slot < _maxSlots; m += step) {
+        await _scheduleDaily(_slotId(h, slot), h, m);
+        slot++;
+      }
+      return;
+    }
+    // Single daily reminder.
+    if (h.reminderMinutes >= 0) {
+      await _scheduleDaily(_idFor(h), h, h.reminderMinutes);
+    }
   } catch (_) {}
 }
 

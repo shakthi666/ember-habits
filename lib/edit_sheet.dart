@@ -15,6 +15,9 @@ Future<void> showHabitSheet(BuildContext context, {Habit? existing}) {
   var isCounter = existing?.isCounter ?? false;
   var target = existing == null || existing.target < 2 ? 3 : existing.target;
   var reminder = existing?.reminderMinutes ?? -1;
+  var every = existing?.reminderEveryMinutes ?? 0;
+  var winStart = existing?.reminderStartMinutes ?? 8 * 60;
+  var winEnd = existing?.reminderEndMinutes ?? 22 * 60;
 
   Color accent() => habitColors[colorIndex][b == Brightness.dark ? 1 : 0];
 
@@ -264,57 +267,124 @@ Future<void> showHabitSheet(BuildContext context, {Habit? existing}) {
                     ),
                   ),
                 label('reminder'),
-                Row(
-                  children: [
-                    Switch(
-                      value: reminder >= 0,
-                      activeColor: accent(),
-                      onChanged: (v) async {
-                        if (v) {
-                          await ensureNotificationPermission();
-                          setSheet(() => reminder = 20 * 60);
-                        } else {
-                          setSheet(() => reminder = -1);
-                        }
-                      },
-                    ),
-                    const SizedBox(width: 12),
-                    if (reminder >= 0)
-                      InkWell(
-                        borderRadius: BorderRadius.circular(12),
-                        onTap: () async {
-                          final t = await showTimePicker(
-                            context: ctx,
-                            initialTime: TimeOfDay(
-                                hour: reminder ~/ 60,
-                                minute: reminder % 60),
-                          );
-                          if (t != null) {
-                            setSheet(
-                                () => reminder = t.hour * 60 + t.minute);
-                          }
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: p.soft,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Text(
-                            '${(reminder ~/ 60).toString().padLeft(2, '0')}:${(reminder % 60).toString().padLeft(2, '0')}',
-                            style: TextStyle(
-                                fontSize: 17,
-                                fontWeight: FontWeight.w800,
-                                color: p.accentDeep),
-                          ),
-                        ),
-                      )
-                    else
-                      Text(L10n.t('reminderOff'),
-                          style: TextStyle(color: p.muted, fontSize: 14)),
-                  ],
+                Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: p.bg,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Row(
+                    children: [
+                      _SegPill(
+                          text: L10n.t('remOff'),
+                          selected: reminder < 0 && every == 0,
+                          accent: accent(),
+                          p: p,
+                          onTap: () => setSheet(() {
+                                reminder = -1;
+                                every = 0;
+                              })),
+                      const SizedBox(width: 4),
+                      _SegPill(
+                          text: L10n.t('remOnce'),
+                          selected: reminder >= 0 && every == 0,
+                          accent: accent(),
+                          p: p,
+                          onTap: () async {
+                            await ensureNotificationPermission();
+                            setSheet(() {
+                              every = 0;
+                              if (reminder < 0) reminder = 20 * 60;
+                            });
+                          }),
+                      const SizedBox(width: 4),
+                      _SegPill(
+                          text: L10n.t('remEvery'),
+                          selected: every > 0,
+                          accent: accent(),
+                          p: p,
+                          onTap: () async {
+                            await ensureNotificationPermission();
+                            setSheet(() {
+                              reminder = -1;
+                              if (every == 0) every = 60;
+                            });
+                          }),
+                    ],
+                  ),
                 ),
+                if (reminder >= 0 && every == 0)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 12),
+                    child: Row(
+                      children: [
+                        Text(L10n.t('remAt'),
+                            style: TextStyle(color: p.muted, fontSize: 14)),
+                        const SizedBox(width: 12),
+                        _TimeChip(
+                            minutes: reminder,
+                            p: p,
+                            onPick: (m) => setSheet(() => reminder = m)),
+                      ],
+                    ),
+                  ),
+                if (every > 0) ...[
+                  Padding(
+                    padding: const EdgeInsets.only(top: 12),
+                    child: Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        for (final mins in const [30, 60, 120, 180, 240])
+                          InkWell(
+                            borderRadius: BorderRadius.circular(999),
+                            onTap: () => setSheet(() => every = mins),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 14, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: every == mins ? accent() : p.soft,
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                              child: Text(
+                                mins < 60
+                                    ? L10n.f('remMin', [mins])
+                                    : L10n.f('remHr', [mins ~/ 60]),
+                                style: TextStyle(
+                                    fontSize: 13.5,
+                                    fontWeight: FontWeight.w700,
+                                    color: every == mins
+                                        ? p.onAccent
+                                        : p.accentDeep),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.only(top: 12),
+                    child: Row(
+                      children: [
+                        Text(L10n.t('remBetween'),
+                            style: TextStyle(color: p.muted, fontSize: 14)),
+                        const SizedBox(width: 10),
+                        _TimeChip(
+                            minutes: winStart,
+                            p: p,
+                            onPick: (m) => setSheet(() => winStart = m)),
+                        const SizedBox(width: 8),
+                        Text(L10n.t('remAnd'),
+                            style: TextStyle(color: p.muted, fontSize: 14)),
+                        const SizedBox(width: 8),
+                        _TimeChip(
+                            minutes: winEnd,
+                            p: p,
+                            onPick: (m) => setSheet(() => winEnd = m)),
+                      ],
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 26),
                 ValueListenableBuilder<TextEditingValue>(
                   valueListenable: controller,
@@ -348,6 +418,9 @@ Future<void> showHabitSheet(BuildContext context, {Habit? existing}) {
                                 h.scheduleDays = schedule;
                                 h.target = isCounter ? target : 1;
                                 h.reminderMinutes = reminder;
+                                h.reminderEveryMinutes = every;
+                                h.reminderStartMinutes = winStart;
+                                h.reminderEndMinutes = winEnd;
                                 store.addOrUpdate(h);
                                 Navigator.of(ctx).pop();
                               },
@@ -369,6 +442,40 @@ Future<void> showHabitSheet(BuildContext context, {Habit? existing}) {
       },
     ),
   );
+}
+
+class _TimeChip extends StatelessWidget {
+  final int minutes;
+  final EmberPalette p;
+  final ValueChanged<int> onPick;
+  const _TimeChip(
+      {required this.minutes, required this.p, required this.onPick});
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(12),
+      onTap: () async {
+        final t = await showTimePicker(
+          context: context,
+          initialTime: TimeOfDay(hour: minutes ~/ 60, minute: minutes % 60),
+        );
+        if (t != null) onPick(t.hour * 60 + t.minute);
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: p.soft,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Text(
+          '${(minutes ~/ 60).toString().padLeft(2, '0')}:${(minutes % 60).toString().padLeft(2, '0')}',
+          style: TextStyle(
+              fontSize: 16, fontWeight: FontWeight.w800, color: p.accentDeep),
+        ),
+      ),
+    );
+  }
 }
 
 class _SegPill extends StatelessWidget {
