@@ -589,39 +589,74 @@ class _CheckButton extends StatelessWidget {
     }
 
     if (habit.isCounter) {
-      return Semantics(
-        button: true,
-        label: '${habit.name} ${habit.countToday}/${habit.target}',
-        child: InkWell(
-        borderRadius: BorderRadius.circular(999),
-        onTap: promptCount,
-        onLongPress: () => store.decrementToday(habit),
-        child: TweenAnimationBuilder<double>(
-          tween: Tween(begin: 1, end: done ? 1.08 : 1),
-          duration: const Duration(milliseconds: 200),
-          builder: (context, v, child) =>
-              Transform.scale(scale: v, child: child),
-          child: Container(
-            width: 56,
-            height: 48,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: done ? accent : Colors.transparent,
-              border:
-                  done ? null : Border.all(color: accent, width: 2),
-              borderRadius: BorderRadius.circular(999),
-            ),
-            child: Text(
-              '${habit.countToday}/${habit.target}',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-                color: done ? p.onAccent : accent,
-              ),
+      // How far past the target the user has gone today (0 = not over).
+      final over = habit.countToday - habit.target;
+      final chip = TweenAnimationBuilder<double>(
+        tween: Tween(begin: 1, end: done ? 1.08 : 1),
+        duration: const Duration(milliseconds: 200),
+        builder: (context, v, child) =>
+            Transform.scale(scale: v, child: child),
+        child: Container(
+          width: 56,
+          height: 48,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: done ? accent : Colors.transparent,
+            border: done ? null : Border.all(color: accent, width: 2),
+            borderRadius: BorderRadius.circular(999),
+          ),
+          child: Text(
+            '${habit.countToday}/${habit.target}',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: done ? p.onAccent : accent,
             ),
           ),
         ),
-      ));
+      );
+      return Semantics(
+        button: true,
+        label: over > 0
+            ? '${habit.name} ${habit.countToday}/${habit.target} (+$over)'
+            : '${habit.name} ${habit.countToday}/${habit.target}',
+        child: InkWell(
+          borderRadius: BorderRadius.circular(999),
+          onTap: promptCount,
+          onLongPress: () => store.decrementToday(habit),
+          // Past the target: badge the surplus so it reads as a bonus,
+          // not a bug. Uses the warm "ember" chip colors.
+          child: over > 0
+              ? Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    chip,
+                    Positioned(
+                      top: -4,
+                      right: -4,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 5, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: p.chipBg,
+                          borderRadius: BorderRadius.circular(999),
+                          border: Border.all(color: p.card, width: 1.5),
+                        ),
+                        child: Text(
+                          '+$over',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                            color: p.chipText,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                )
+              : chip,
+        ),
+      );
     }
 
     return Semantics(
