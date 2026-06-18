@@ -1,7 +1,7 @@
 name: ember_habits
 description: "Ember - a warm, simple habit tracker with streaks, reminders, widget and 39 languages. Offline."
 publish_to: "none"
-version: 1.1.5+7
+version: 1.1.6+8
 environment:
   sdk: ">=3.4.0 <4.0.0"
   
